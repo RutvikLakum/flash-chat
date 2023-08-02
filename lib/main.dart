@@ -7,6 +7,7 @@ import 'package:flash_chat/screens/welcome_screen.dart';
 
 
 void main() async {
+  
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   runApp(FlashChat());
@@ -16,6 +17,7 @@ class FlashChat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false, 
       initialRoute: WelcomeScreen.id,
     
       routes: {

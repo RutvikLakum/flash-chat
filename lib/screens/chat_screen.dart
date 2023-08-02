@@ -2,42 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:flash_chat/constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 final _firestore = FirebaseFirestore.instance;
-late User loggedInUser; 
-
+late User loggedInUser;
 
 class ChatScreen extends StatefulWidget {
-  static  String id = 'chat_screen';
+  static String id = 'chat_screen';
   @override
   _ChatScreenState createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-final messageTextController = TextEditingController();
-final _auth = FirebaseAuth.instance;
+  final messageTextController = TextEditingController();
+  final _auth = FirebaseAuth.instance;
 
-late String messageText;
+  late String messageText;
 
-@override
-void initState() {
-  super.initState();
-  getCurrentUser();
-}
-
-void getCurrentUser() async {
-  try {
-    final user =  _auth.currentUser;
-    if (user != null) {
-      loggedInUser = user;
-      print(loggedInUser.email);
-    }
-  } catch (e) {
-    print(e);
+  @override
+  void initState() {
+    super.initState();
+    getCurrentUser();
   }
-}
 
-
+  void getCurrentUser() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        loggedInUser = user;
+        print(loggedInUser.email);
+      }
+    } catch (e) {
+      print(e);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,11 +44,10 @@ void getCurrentUser() async {
         leading: null,
         actions: <Widget>[
           IconButton(
-              icon:const Icon(Icons.close),
+              icon: const Icon(Icons.close),
               onPressed: () {
-            
-                 _auth.signOut();
-                 Navigator.pop(context);
+                _auth.signOut();
+                Navigator.pop(context);
               }),
         ],
         title: const Text('⚡️Chat'),
@@ -61,10 +58,7 @@ void getCurrentUser() async {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-                  
             MessagesStream(),
-
-        
             Container(
               decoration: kMessageContainerDecoration,
               child: Row(
@@ -85,6 +79,7 @@ void getCurrentUser() async {
                       _firestore.collection('messages').add({
                         'text': messageText,
                         'sender': loggedInUser.email,
+                        'timestamp': FieldValue.serverTimestamp(),
                       });
                     },
                     child: const Text(
@@ -103,72 +98,73 @@ void getCurrentUser() async {
 }
 
 class MessagesStream extends StatelessWidget {
-     
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-                          stream: _firestore.collection('messages').snapshots(),
-                  builder: (context, snapshot) {
-                     if (!snapshot.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          backgroundColor: Colors.lightBlueAccent,
-                        )
-                      );
-                     }
-                    final messages = snapshot.data!.docs.reversed;
+        stream: _firestore.collection('messages').orderBy('timestamp', descending: false).snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(
+                child: CircularProgressIndicator(
+              backgroundColor: Colors.lightBlueAccent,
+            ));
+          }
+          final messages = snapshot.data!.docs.reversed;
 
-                       List<MessageBubble> messageBubbles = [];
-                          for (var message in messages) {
-                  final Map<String, dynamic>? messageData = message.data() as Map<String, dynamic>?; // Explicit cast to Map<String, dynamic>?
+          List<MessageBubble> messageBubbles = [];
+          for (var message in messages) {
+            final Map<String, dynamic>? messageData =
+                message.data() as Map<String, dynamic>?;
 
-                          if (messageData != null) {
-                        final messageText = messageData['text'] as String; // Access using '[]' operator
-                           final messageSender = messageData['sender'] as String; // Access using '[]' operator
-                           
-                                    final currentUser = loggedInUser.email;
+            if (messageData != null) {
+              final messageText = messageData['text'] as String;
+              final messageSender = messageData['sender'] as String;
+              final timestamp = messageData['timestamp'] as Timestamp?;
+              final currentUser = loggedInUser.email;
 
-                                    
+              final messageBubble = MessageBubble(
+                sender: messageSender,
+                text: messageText,
+                isMe: currentUser == messageSender,
+                timestamp: DateTime.timestamp(
+                  
+                ),
+              );
 
-                                  
-
-                         final messageBubble = MessageBubble(
-                          sender: messageSender, 
-                          text: messageText,
-                          isMe: currentUser == messageSender,);
-
-
-                       messageBubbles.add(messageBubble);
-                       }
-                       }
-                   return Expanded(
-                     child: ListView(
-                      reverse: true,
-                      padding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 20.0),
-                     children: messageBubbles,
-                          ),
-                   );
-                  }
-                );
-                
-
+              messageBubbles.add(messageBubble);
+            }
+          }
+          return Expanded(
+            child: ListView(
+              reverse: true,
+              padding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 20.0),
+              children: messageBubbles,
+            ),
+          );
+        });
   }
 }
 
 class MessageBubble extends StatelessWidget {
-   MessageBubble({required this.sender,required this.text,required this.isMe});
+  MessageBubble({
+    required this.sender,
+    required this.text,
+    required this.isMe,
+    this.timestamp,
+  });
 
-   final String sender;
-   final String text;
-   final bool isMe;
+  final String sender;
+  final String text;
+  final bool isMe;
+  final DateTime? timestamp;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(10.0),
       child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: <Widget>[
           Text(
             sender,
@@ -178,31 +174,44 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
           Material(
-            borderRadius: isMe ? 
-            const BorderRadius.only(
-            topLeft: Radius.circular(30.0),
-            bottomLeft: Radius.circular(30.0),
-            bottomRight: Radius.circular(30.0))
-            : const BorderRadius.only(
-              bottomLeft:Radius.circular(30.0),
-              bottomRight: Radius.circular(30.0),
-              topRight: Radius.circular(30.0),  
-            ),
+            borderRadius: isMe
+                ? const BorderRadius.only(
+                    topLeft: Radius.circular(30.0),
+                    bottomLeft: Radius.circular(30.0),
+                    bottomRight: Radius.circular(30.0),
+                  )
+                : const BorderRadius.only(
+                    bottomLeft: Radius.circular(30.0),
+                    bottomRight: Radius.circular(30.0),
+                    topRight: Radius.circular(30.0),
+                  ),
             elevation: 5.0,
-            color: isMe ? Colors.lightBlueAccent :Colors.white,
-            child: Padding( 
-            padding:EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0),
-
-            child: Text(
-              text,
-              style:  TextStyle(
-                color: isMe ? Colors.white : Colors.black54,
-                fontSize: 15.0,
+            color: isMe ? Colors.lightBlueAccent : Colors.white,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text,
+                    style: TextStyle(
+                      color: isMe ? Colors.white : Colors.black54,
+                      fontSize: 15.0,
+                    ),
+                  ),
+                  if (timestamp != null)
+                    Text(
+                      DateFormat('dd/MM/yyyy - HH:mm').format(timestamp!),
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 12.0,
+                      ),
+                    ),
+                ],
               ),
-            ),),
-          
-          )
-        ]
+            ),
+          ),
+        ],
       ),
     );
   }
